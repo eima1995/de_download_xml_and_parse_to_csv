@@ -1,0 +1,6 @@
+mechanize 
+beautifulsoup4 
+openpyxl 
+requests 
+tqdm 
+lxml
