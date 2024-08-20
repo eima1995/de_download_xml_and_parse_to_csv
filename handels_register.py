@@ -330,36 +330,36 @@ def save_to_excel(companies, merged_data, filepath):
         vertretungsbefugnis = company.get("vertretungsbefugnis", "")
 
         # Check if the company name already exists in the "Goal output" sheet
-        #existing_row = None
-        # for row in sheet_2.iter_rows(min_row=2, values_only=False):
-        #     if row[0].value == name:  # Assuming the company name is in the first column
-        #         existing_row = row
-        #         break
+        existing_row = None
+        for row in sheet_2.iter_rows(min_row=2, values_only=False):
+            if row[0].value == name:  # Assuming the company name is in the first column
+                existing_row = row
+                break
 
         # If the company name exists, update the existing row
-        # if existing_row:
-        #     existing_row[1].value = court
-        #     existing_row[2].value = state
-        #     existing_row[3].value = status
-        #     existing_row[4].value = bezeichnung
-        #     existing_row[5].value = rechtsform
-        #     existing_row[6].value = strasse
-        #     existing_row[7].value = hausnummer
-        #     existing_row[8].value = postleitzahl
-        #     existing_row[9].value = ort
-        #     existing_row[10].value = vorname
-        #     existing_row[11].value = nachname
-        #     existing_row[12].value = geschlecht
-        #     existing_row[13].value = geburtsdatum
-        #     existing_row[14].value = gegenstand
-        #     existing_row[15].value = vertretungsbefugnis
-        # else:
+        if existing_row:
+            existing_row[1].value = court
+            existing_row[2].value = state
+            existing_row[3].value = status
+            existing_row[4].value = bezeichnung
+            existing_row[5].value = rechtsform
+            existing_row[6].value = strasse
+            existing_row[7].value = hausnummer
+            existing_row[8].value = postleitzahl
+            existing_row[9].value = ort
+            existing_row[10].value = vorname
+            existing_row[11].value = nachname
+            existing_row[12].value = geschlecht
+            existing_row[13].value = geburtsdatum
+            existing_row[14].value = gegenstand
+            existing_row[15].value = vertretungsbefugnis
+        else:
             # If the company name does not exist, add a new row
-        sheet_2.append([
-            name, court, state, status, bezeichnung, rechtsform, strasse,
-            hausnummer, postleitzahl, ort, vorname, nachname, geschlecht,
-            geburtsdatum, gegenstand, vertretungsbefugnis
-        ])
+            sheet_2.append([
+                name, court, state, status, bezeichnung, rechtsform, strasse,
+                hausnummer, postleitzahl, ort, vorname, nachname, geschlecht,
+                geburtsdatum, gegenstand, vertretungsbefugnis
+            ])
 
     # Save workbook to Excel file
     workbook.save(filepath)
