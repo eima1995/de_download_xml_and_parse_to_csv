@@ -4,7 +4,7 @@ This project retrieves company data using the Handelsregister API in XML format,
 ### How to Use
 To get started, list the exact names of the companies you want to download in the `company_names.csv` file. The project will use this file to fetch and save the details for each listed company.
 
-### Run
+### Setup
 1. Navigate to the project directory:
    ```
    cd download_xml_and_parse_to_csv
