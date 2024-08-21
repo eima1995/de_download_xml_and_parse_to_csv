@@ -16,8 +16,8 @@ To get started, list the exact names of the companies you want to download in th
    python handels_register.py
    ```
 ### Result
-Once the project is executed, a file named `handelsregister_result.xlsx` will be generated in the project's root folder. Inside the file, you will find two sheets: "Current output" and "Goal output".
+Once the project is executed, a file named `handelsregister_result.xlsx` will be generated in the project's root folder. Inside the file, you will find two sheets: `Current output` and `Goal output`.
 
 #### Note
-The "Current output" sheet adds a new entry for each company listed in company_names.csv every time you run the project. In contrast, the "Goal output" sheet checks if a company is already listed; if it is, the existing row is updated. If the company is not already in the list, a new row is added.
+The `Current output` sheet adds a new entry for each company listed in `company_names.csv` every time you run the project. In contrast, the `Goal output` sheet checks if a company is already listed; if it is, the existing row is updated. If the company is not already in the list, a new row is added.
 
