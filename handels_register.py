@@ -170,20 +170,45 @@ class HandelsRegister:
         return html, cookie_dict
 
     def get_companies_xml_file(self, soup, cookies):
+        # Find the table body containing the results
         tbody = soup.find('tbody', id='ergebnissForm:selectedSuchErgebnisFormTable_data')
+
+        if not tbody:
+            print("No results table found. This error maybe probably due to incorrect company name.")
+            return False # Exit the function if the tbody is not found
+
+        # Find the first row within the results table
         first_row = tbody.find('tr')
+
+        if not first_row:
+            print("No rows found in the results table. This error maybe probably due to incorrect company name.")
+            return False # Exit the function if no rows are found
+            
+        # Find all <a> tags within the first row
+        a_tags = first_row.find_all('a')
+
+        # Check if any <a> tags are found
+        if not a_tags:
+            print("No <a> tags found in the first row. This error maybe probably due to incorrect company name.")
+            return False # Exit the function if no <a> tags are found
+
+        # Get the last <a> tag
         last_a_tag = first_row.find_all('a')[-1]
         last_a_id = last_a_tag.get('id')
 
+        # Find the form element by ID
         form_element = soup.find('form', id='ergebnissForm')
         action_url = form_element['action']
         query_string = action_url.split('?')[1] if '?' in action_url else ''
 
+        # Get the ViewState value
         view_state_element = soup.find('input', {'name': 'javax.faces.ViewState'})
         view_state = view_state_element.get('value') if view_state_element else None
 
+        # Get the JSESSIONID cookie value
         jsessionid_cookie = cookies.get("JSESSIONID", "")
 
+        # Construct the URL for the POST request
         url = f"https://www.handelsregister.de/rp_web/xhtml/research/sucheErgebnisse.xhtml?{query_string}"
 
         headers = {
@@ -219,6 +244,7 @@ class HandelsRegister:
 
         response = requests.post(url, headers=headers, data=data)
 
+        # Save the XML file
         with open("downloaded_file.xml", "wb") as file:
             file.write(response.content)
 
@@ -235,7 +261,11 @@ class HandelsRegister:
         self.xml_parser = XMLParser(xml_file_path)
 
         # Parse the XML
-        self.xml_parser.parse_xml()
+        try:
+            self.xml_parser.parse_xml()
+        except Exception as e:
+            print(f"Error parsing XML file: {e}")
+            return []
 
         # Define namespace
         ns = {'tns': 'http://www.xjustiz.de'}
