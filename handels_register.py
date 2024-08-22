@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import openpyxl
 import requests
 import os
-import csv
+import pandas as pd
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 from lxml import etree
@@ -438,37 +438,38 @@ def parse_args(default_schlagwoerter):
     return args
 
 def main():
-    # Path to your CSV file
-    csv_file_path = pathlib.Path("company_names.csv")
+    # Define paths to your files
+    excel_file_path = pathlib.Path("company_names.xlsx")
     xml_file_path = 'downloaded_file.xml'  # Path to the XML file
 
-    # Check if the CSV file exists
-    if not csv_file_path.exists():
-        print(f"CSV file {csv_file_path} does not exist.")
+    # Check if the Excel file exists
+    if not excel_file_path.exists():
+        print(f"Error: Excel file {excel_file_path} does not exist.")
         sys.exit(1)
     
-    # Read the CSV file and process each company name
-    with open(csv_file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.reader(csvfile)
-        next(reader, None)
+    # Read the Excel file and process each company name
+    try:
+        df = pd.read_excel(excel_file_path)
+    except Exception as e:
+        print(f"Error reading the Excel file: {e}")
+        sys.exit(1)
 
-        rows = list(reader)  # Convert reader to list
+    # With the company names in the first column and start from the second row
+    company_names = df.iloc[:, 0].dropna().tolist()
 
-        for row in tqdm(rows, desc="Processing company names"):
-            if row:  # Ensure the row is not empty
-                company_name = row[0]
-                
-                # Get arguments with the current company name as the default schlagwoerter
-                args = parse_args(default_schlagwoerter=company_name)
+    for company_name in tqdm(company_names, desc="Processing company names"):
+            
+        # Get arguments with the current company name as the default schlagwoerter
+        args = parse_args(default_schlagwoerter=company_name)
 
-                h = HandelsRegister(args)
-                h.open_startpage()
-                html, cookies = h.search_company()
-                companies = h.get_companies_in_searchresults(html, cookies, xml_file_path)
-                
-                if companies:
-                    save_to_excel(companies[0], companies[1], args.output)
-                    print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
+        h = HandelsRegister(args)
+        h.open_startpage()
+        html, cookies = h.search_company()
+        companies = h.get_companies_in_searchresults(html, cookies, xml_file_path)
+        
+        if companies:
+            save_to_excel(companies[0], companies[1], args.output)
+            print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
 
 if __name__ == "__main__":
     main()
