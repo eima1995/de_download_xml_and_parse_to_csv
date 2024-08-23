@@ -1,9 +1,7 @@
 import argparse
 import mechanize
-import re
 import pathlib
 import sys
-import json
 from bs4 import BeautifulSoup
 import openpyxl
 import requests
@@ -12,6 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 from lxml import etree
+import concurrent.futures
 
 # Dictionaries to map arguments to values
 schlagwortOptionen = {
@@ -19,7 +18,6 @@ schlagwortOptionen = {
     "min": 2,
     "exact": 3
 }
-
 
 class XMLParser:
     def __init__(self, xml_file_path):
@@ -53,33 +51,49 @@ class XMLParser:
         return None
 
     def retrieve_xml_data(self, namespaces):
-        bezeichnung_aktuell = self.get_element_text('.//tns:bezeichnung.aktuell', namespaces=namespaces)
-        anschrift_strasse = self.get_element_text('.//tns:anschrift/tns:strasse', namespaces=namespaces)
-        anschrift_hausnummer = self.get_element_text('.//tns:anschrift/tns:hausnummer', namespaces=namespaces)
-        anschrift_postleitzahl = self.get_element_text('.//tns:anschrift/tns:postleitzahl', namespaces=namespaces)
-        anschrift_ort = self.get_element_text('.//tns:anschrift/tns:ort', namespaces=namespaces)
-        vorname = self.get_element_text('.//tns:vollerName/tns:vorname', namespaces=namespaces)
-        nachname = self.get_element_text('.//tns:vollerName/tns:nachname', namespaces=namespaces)
-        geburtsdatum = self.get_element_text('.//tns:geburt/tns:geburtsdatum', namespaces=namespaces)
-        geschlecht = self.get_comment_from_element('.//tns:geschlecht', namespaces=namespaces)
-        rechtsform_comment = self.get_comment_from_element('.//tns:angabenZurRechtsform/tns:rechtsform', namespaces=namespaces)
-        gegenstand = self.get_element_text('.//tns:basisdatenRegister/tns:gegenstand', namespaces=namespaces)
-        vertretungsbefugnis = self.get_element_text('.//tns:auswahl_vertretungsbefugnis/tns:vertretungsbefugnisFreitext', namespaces=namespaces)
-        
-        results = {
-            "bezeichnung":bezeichnung_aktuell,
-            "rechtsform":rechtsform_comment,
-            "strasse":anschrift_strasse,
-            "hausnummer":anschrift_hausnummer,
-            "postleitzahl":anschrift_postleitzahl,
-            "ort":anschrift_ort,
-            "vorname":vorname,
-            "nachname":nachname,
-            "geschlecht":geschlecht,
-            "geburtsdatum":geburtsdatum,
-            "gegenstand":gegenstand,
-            "vertretungsbefugnis":vertretungsbefugnis
-        }
+        """
+        This function will parse and retrieve elements from the XML.
+        """
+        results = []
+
+        # Find all <tns:vollerName> elements
+        vollerName_elements = self.root.findall('.//tns:vollerName', namespaces=namespaces)
+
+        # Count the occurrences of <tns:vollerName>
+        count_vollerName = len(vollerName_elements)
+    
+        for i in range(count_vollerName):
+            bezeichnung_aktuell = self.get_element_text('.//tns:bezeichnung.aktuell', namespaces=namespaces)
+            anschrift_strasse = self.get_element_text('.//tns:anschrift/tns:strasse', namespaces=namespaces)
+            anschrift_hausnummer = self.get_element_text('.//tns:anschrift/tns:hausnummer', namespaces=namespaces)
+            anschrift_postleitzahl = self.get_element_text('.//tns:anschrift/tns:postleitzahl', namespaces=namespaces)
+            anschrift_ort = self.get_element_text('.//tns:anschrift/tns:ort', namespaces=namespaces)
+
+            vorname = vollerName_elements[i].find('tns:vorname', namespaces=namespaces).text
+            nachname = vollerName_elements[i].find('tns:nachname', namespaces=namespaces).text
+            geburtsdatum = self.root.findall('.//tns:geburtsdatum', namespaces=namespaces)[i].text  
+
+            geschlecht = self.get_comment_from_element('.//tns:geschlecht', namespaces=namespaces)
+            rechtsform_comment = self.get_comment_from_element('.//tns:angabenZurRechtsform/tns:rechtsform', namespaces=namespaces)
+            gegenstand = self.get_element_text('.//tns:basisdatenRegister/tns:gegenstand', namespaces=namespaces)
+            vertretungsbefugnis = self.get_element_text('.//tns:auswahl_vertretungsbefugnis/tns:vertretungsbefugnisFreitext', namespaces=namespaces)
+            
+            result = {
+                "bezeichnung":bezeichnung_aktuell,
+                "rechtsform":rechtsform_comment,
+                "strasse":anschrift_strasse,
+                "hausnummer":anschrift_hausnummer,
+                "postleitzahl":anschrift_postleitzahl,
+                "ort":anschrift_ort,
+                "vorname":vorname,
+                "nachname":nachname,
+                "geschlecht":geschlecht,
+                "geburtsdatum":geburtsdatum,
+                "gegenstand":gegenstand,
+                "vertretungsbefugnis":vertretungsbefugnis
+            }
+
+            results.append(result)
 
         return results
 
@@ -271,24 +285,30 @@ class HandelsRegister:
         ns = {'tns': 'http://www.xjustiz.de'}
 
         # Retrieve XML data
-        xml_data = [self.xml_parser.retrieve_xml_data(ns)]
+        xml_data = self.xml_parser.retrieve_xml_data(ns)
 
-        results = []
-        for result in grid.find_all('tr'):
-            a = result.get('data-ri')
-            if a is not None:
-                d = self.parse_result(result)
-                results.append(d)
+        results_i = []
+        merged_data_i = []
 
-        # Merge results and xml_data
-        merged_data = []
-        for i in range(len(results)):
-            merged_entry = {**results[i], **xml_data[i]}
-            merged_entry.pop('documents', None)
-            merged_entry.pop('history', None)
-            merged_data.append(merged_entry)
+        for x in range(len(xml_data)):
+            results = []
+            for result in grid.find_all('tr'):
+                a = result.get('data-ri')
+                if a is not None:
+                    d = self.parse_result(result)
+                    results.append(d)
+            results_i.append(results)
+
+            # Merge results and xml_data[x]
+            merged_data = []
+            for i in range(len(results)):
+                merged_entry = {**results[i], **xml_data[x]}
+                merged_entry.pop('documents', None)
+                merged_entry.pop('history', None)
+                merged_data.append(merged_entry)
+            merged_data_i.append(merged_data)
        
-        return results, merged_data
+        return results_i, merged_data_i
 
     def parse_result(self, result):
         cells = []
@@ -362,7 +382,7 @@ def save_to_excel(companies, merged_data, filepath):
         # Check if the company name already exists in the "Goal output" sheet
         existing_row = None
         for row in sheet_2.iter_rows(min_row=2, values_only=False):
-            if row[0].value == name:  # Assuming the company name is in the first column
+            if row[0].value == name and row[10].value == vorname:  # Assuming the company name is in the first column
                 existing_row = row
                 break
 
@@ -437,6 +457,29 @@ def parse_args(default_schlagwoerter):
 
     return args
 
+def process_company(company_name, xml_file_path):
+    # Get arguments with the current company name as the default schlagwoerter
+    args = parse_args(default_schlagwoerter=company_name)
+
+    h = HandelsRegister(args)
+    h.open_startpage()
+    html, cookies = h.search_company()
+    companies = h.get_companies_in_searchresults(html, cookies, xml_file_path)
+
+    # Ensure there are at least two arrays lists before proceeding
+    if len(companies) < 2:
+        print(f"Insufficient data for company: {company_name}")
+        return
+
+    # Process each company data
+    for j in range(min(len(companies[0]), len(companies[1]))):
+        try:
+            save_to_excel(companies[0][j], companies[1][j], args.output)
+            print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
+        except IndexError as e:
+            print(f"IndexError encountered while processing company: {company_name}, index {j}: {str(e)}")
+            continue
+
 def main():
     # Define paths to your files
     excel_file_path = pathlib.Path("company_names.xlsx")
@@ -454,22 +497,12 @@ def main():
         print(f"Error reading the Excel file: {e}")
         sys.exit(1)
 
-    # With the company names in the first column and start from the second row
+    # Get the company names from the first column and start from the second row
     company_names = df.iloc[:, 0].dropna().tolist()
 
-    for company_name in tqdm(company_names, desc="Processing company names"):
-            
-        # Get arguments with the current company name as the default schlagwoerter
-        args = parse_args(default_schlagwoerter=company_name)
-
-        h = HandelsRegister(args)
-        h.open_startpage()
-        html, cookies = h.search_company()
-        companies = h.get_companies_in_searchresults(html, cookies, xml_file_path)
-        
-        if companies:
-            save_to_excel(companies[0], companies[1], args.output)
-            print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
+    # Use ThreadPoolExecutor for parallel processing of company names
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        list(tqdm(executor.map(lambda company_name: process_company(company_name, xml_file_path), company_names), desc="Processing company names", total=len(company_names)))
 
 if __name__ == "__main__":
     main()
