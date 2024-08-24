@@ -4,6 +4,8 @@ import pathlib
 import sys
 from bs4 import BeautifulSoup
 import openpyxl
+from openpyxl.utils.exceptions import InvalidFileException
+import zipfile
 import requests
 import os
 import pandas as pd
@@ -336,20 +338,36 @@ class HandelsRegister:
 
 def save_to_excel(companies, merged_data, filepath):
     try:
-        workbook = openpyxl.load_workbook(filepath)
+        # Attempt to load the existing workbook
+        if os.path.exists(filepath):
+            workbook = openpyxl.load_workbook(filepath)
+        else:
+            raise FileNotFoundError
+        
+        # Access the active sheet or create necessary sheets
         sheet = workbook.active
         sheet_2 = workbook["Goal output"] if "Goal output" in workbook.sheetnames else workbook.create_sheet(title="Goal output")
+    
     except FileNotFoundError:
+        # Create a new workbook if the file doesn't exist
         workbook = openpyxl.Workbook()
 
+        # Create new sheets and set titles
         sheet = workbook.active
         sheet_2 = workbook.create_sheet(title="Goal output")
-
         sheet.title = "Current output"
         sheet_2.title = "Goal output"
 
         sheet.append(["Firmenname", "Gericht", "Sitz", "Status", "Handelsregister-Nummer", "Dokumente", "Verlauf"])
         sheet_2.append(["Company Name", "Court", "City", "Status", "Bezeichnung", "Rechtsform", "Straße", "Hausnummer", "Postleitzahl", "Ort", "Vorname", "Nachname", "Geschlecht", "Geburtsdatum", "Gegenstand", "Vertretungsbefugnis"])
+
+    except (InvalidFileException, zipfile.BadZipFile) as e:
+        print(f"Error: The file '{filepath}' is not a valid Excel file or is corrupted: {e}")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred while loading the Excel file: {e}")
+        return
+
 
     for company in companies:
         sheet.append([
@@ -412,7 +430,11 @@ def save_to_excel(companies, merged_data, filepath):
             ])
 
     # Save workbook to Excel file
-    workbook.save(filepath)
+    try:
+        workbook.save(filepath)
+        print(f"Data saved to {filepath}")
+    except Exception as e:
+        print(f"An error occurred while saving the Excel file: {e}")
 
 def parse_args(default_schlagwoerter):
     parser = argparse.ArgumentParser(description='A handelsregister CLI')
