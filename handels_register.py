@@ -176,8 +176,8 @@ class HandelsRegister:
             html = response_result.read().decode("utf-8")
 
             
-            with open(cachename, "w") as f:
-                f.write(html)
+            # with open(cachename, "w") as f:
+            #     f.write(html)
             
             # Capture cookies from the mechanize browser
             cookies = self.browser._ua_handlers['_cookies'].cookiejar
@@ -185,7 +185,7 @@ class HandelsRegister:
 
         return html, cookie_dict
 
-    def get_companies_xml_file(self, soup, cookies):
+    def get_companies_xml_file(self, soup, cookies, company_name):
         # Find the table body containing the results
         tbody = soup.find('tbody', id='ergebnissForm:selectedSuchErgebnisFormTable_data')
 
@@ -259,58 +259,59 @@ class HandelsRegister:
         }
 
         response = requests.post(url, headers=headers, data=data)
+        company_name = str(company_name).replace('/', '')
 
         # Save the XML file
-        with open("downloaded_file.xml", "wb") as file:
+        with open(f"files/{company_name}.xml", "wb") as file:
             file.write(response.content)
 
         print("File downloaded successfully")
 
-    def get_companies_in_searchresults(self, html, cookies, xml_file_path):
+    def get_companies_in_searchresults(self, html, cookies, xml_file_path, company_name):
         soup = BeautifulSoup(html, 'html.parser')
         grid = soup.find('table', role='grid')
 
         # Call the new function to download the XML file
-        self.get_companies_xml_file(soup, cookies)
+        self.get_companies_xml_file(soup, cookies, company_name=company_name)
 
-        # Initialize XMLParser
-        self.xml_parser = XMLParser(xml_file_path)
-
-        # Parse the XML
-        try:
-            self.xml_parser.parse_xml()
-        except Exception as e:
-            print(f"Error parsing XML file: {e}")
-            return []
-
-        # Define namespace
-        ns = {'tns': 'http://www.xjustiz.de'}
-
-        # Retrieve XML data
-        xml_data = self.xml_parser.retrieve_xml_data(ns)
-
-        results_i = []
-        merged_data_i = []
-
-        for x in range(len(xml_data)):
-            results = []
-            for result in grid.find_all('tr'):
-                a = result.get('data-ri')
-                if a is not None:
-                    d = self.parse_result(result)
-                    results.append(d)
-            results_i.append(results)
-
-            # Merge results and xml_data[x]
-            merged_data = []
-            for i in range(len(results)):
-                merged_entry = {**results[i], **xml_data[x]}
-                merged_entry.pop('documents', None)
-                merged_entry.pop('history', None)
-                merged_data.append(merged_entry)
-            merged_data_i.append(merged_data)
-       
-        return results_i, merged_data_i
+        # # Initialize XMLParser
+        # self.xml_parser = XMLParser(xml_file_path)
+        #
+        # # Parse the XML
+        # try:
+        #     self.xml_parser.parse_xml()
+        # except Exception as e:
+        #     print(f"Error parsing XML file: {e}")
+        #     return []
+        #
+        # # Define namespace
+        # ns = {'tns': 'http://www.xjustiz.de'}
+        #
+        # # Retrieve XML data
+        # xml_data = self.xml_parser.retrieve_xml_data(ns)
+        #
+        # results_i = []
+        # merged_data_i = []
+        #
+        # for x in range(len(xml_data)):
+        #     results = []
+        #     for result in grid.find_all('tr'):
+        #         a = result.get('data-ri')
+        #         if a is not None:
+        #             d = self.parse_result(result)
+        #             results.append(d)
+        #     results_i.append(results)
+        #
+        #     # Merge results and xml_data[x]
+        #     merged_data = []
+        #     for i in range(len(results)):
+        #         merged_entry = {**results[i], **xml_data[x]}
+        #         merged_entry.pop('documents', None)
+        #         merged_entry.pop('history', None)
+        #         merged_data.append(merged_entry)
+        #     merged_data_i.append(merged_data)
+        #
+        # return results_i, merged_data_i
 
     def parse_result(self, result):
         cells = []
@@ -486,26 +487,27 @@ def process_company(company_name, xml_file_path):
     h = HandelsRegister(args)
     h.open_startpage()
     html, cookies = h.search_company()
-    companies = h.get_companies_in_searchresults(html, cookies, xml_file_path)
+    companies = h.get_companies_in_searchresults(html, cookies, xml_file_path, company_name)
 
     # Ensure there are at least two arrays lists before proceeding
-    if len(companies) < 2:
-        print(f"Insufficient data for company: {company_name}")
-        return
+    if companies is not None:
+        if len(companies) < 2:
+            print(f"Insufficient data for company: {company_name}")
+            return
 
-    # Process each company data
-    for j in range(min(len(companies[0]), len(companies[1]))):
-        try:
-            save_to_excel(companies[0][j], companies[1][j], args.output)
-            print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
-        except IndexError as e:
-            print(f"IndexError encountered while processing company: {company_name}, index {j}: {str(e)}")
-            continue
+        # Process each company data
+        for j in range(min(len(companies[0]), len(companies[1]))):
+            try:
+                save_to_excel(companies[0][j], companies[1][j], args.output)
+                print(f"Ergebnisse wurden in der Datei {args.output} gespeichert.")
+            except IndexError as e:
+                print(f"IndexError encountered while processing company: {company_name}, index {j}: {str(e)}")
+                continue
 
 def main():
     # Define paths to your files
     excel_file_path = pathlib.Path("company_names.xlsx")
-    xml_file_path = 'downloaded_file.xml'  # Path to the XML file
+    xml_file_path = 'files/.xml'  # Path to the XML file
 
     # Check if the Excel file exists
     if not excel_file_path.exists():
